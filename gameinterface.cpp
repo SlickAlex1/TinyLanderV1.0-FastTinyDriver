@@ -24,7 +24,8 @@
 
 #include <Arduino.h>
 #include "gameinterface.h"
-#include <ssd1306xled.h>
+//#include <ssd1306xled.h>
+#include "FastTinyDriver.h"
 
 void TINYJOYPAD_INIT(void) {
   pinMode(1, INPUT);

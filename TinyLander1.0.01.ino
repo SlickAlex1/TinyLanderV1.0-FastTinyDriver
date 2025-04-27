@@ -1,34 +1,21 @@
 //   >>>>>  T-I-N-Y  L-A-N-D-E-R v1.0 for ATTINY85  GPLv3 <<<<
 //              Programmer: (c) Roger Buehler 2020
-//              Contact EMAIL: tscha70@gmail.com
-//        Official repository:  https://github.com/tscha70/
-//  Tiny Lander v1.0 is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+//              Adapted for FastTinyDriver by SlickAlex
+//              Official: https://github.com/tscha70/ | https://www.tinyjoypad.com
+//              This version: uses FastTinyDriver for the SSD1306 OLED; 
 
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-
-//  You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//     
-//  This game uses features or part of code created by 
-//  Daniel C (Electro L.I.B) https://www.tinyjoypad.com under GPLv3
-//  to work with tinyjoypad game console's standard.
-//             
-// the code works at 16MHZ internal
-// and use ssd1306xled Library for SSD1306 oled display 128x64
-
-#include <ssd1306xled.h>
+#include "FastTinyDriver.h"
 #include "spritebank.h"
 #include "gameinterface.h"
 
 void setup() {
-  SSD1306.ssd1306_init();
-  SSD1306.ssd1306_fillscreen(0x00);
+  TinyOLED_init();
+  // Fill screen black (formerly SSD1306.ssd1306_fillscreen(0x00))
+  for (uint8_t y = 0; y < 8; y++) {
+    ssd1306_selectPage(y);
+    for (uint8_t x = 0; x < 128; x++) i2c_write(0x00);
+    i2c_stop();
+  }
   TINYJOYPAD_INIT();
 }
 
@@ -37,7 +24,6 @@ void loop() {
   DIGITAL velX;
   DIGITAL velY;
   GAME game;
-
 BEGIN:
   game.Level = 1;
   game.Score = 0;
@@ -57,11 +43,9 @@ BEGIN:
         SOUND(100, 125);
         SOUND(50, 125);
       }
-
       goto START;
     }
   }
-
 START:
   initGame(&game);
   INTROSOUND();
@@ -87,7 +71,6 @@ START:
           goto START;
         goto BEGIN;
       }
-
     }
     if (game.ShipExplode > 0 || game.Collision)
       game.EndCounter++;
@@ -95,7 +78,6 @@ START:
       game.EndCounter = 10;
   }
 }
-
 
 void initGame (GAME * game)
 {
@@ -232,30 +214,24 @@ void fillData(long myValue, DIGITAL * data)
 }
 
 uint8_t ScoreDisplay(uint8_t x, uint8_t y, DIGITAL * score) {
-  // show score within the give limits on lin 1
   if  ((y != 1) || (x < SCOREOFFSET) || (x > (SCOREOFFSET + (SCOREDIGITS * DIGITSIZE) - 1))) {
     return 0;
   }
-  // show all of the file digits
   uint8_t part =  (x - SCOREOFFSET) / (DIGITSIZE);
   return pgm_read_byte(&DIGITS[x - SCOREOFFSET - (DIGITSIZE * part) + (score->D[(SCOREDIGITS - 1) - part] * DIGITSIZE)]);
 }
 
 uint8_t VelocityDisplay(uint8_t x, uint8_t y, DIGITAL * velocity, uint8_t horizontal)
 {
-  // if on line 4 or 5  for horizontal(4) an vertical(4) speed
   if ((horizontal == 1 && y != 4) || (horizontal == 0 && y != 5)) {
     return 0;
   }
-  // display velocity within the limits ...
   if ((x < VELOOFFSET) || (x > (VELOOFFSET + (VELODIGITS * DIGITSIZE)) - 1)) {
     return 0;
   }
-  // show plus or minus sign
   if ((x >= VELOOFFSET) && (x < (VELOOFFSET + DIGITSIZE))) {
     return pgm_read_byte(&DIGITS[x - VELOOFFSET + ((10 + (velocity->IsNegative)) * DIGITSIZE)]);
   }
-  // show just 3 digits
   uint8_t part =  ((x - VELOOFFSET) / (DIGITSIZE));
   return pgm_read_byte(&DIGITS[x - VELOOFFSET - (DIGITSIZE * part) + (velocity->D[(VELODIGITS - 1) - part] * DIGITSIZE)]);
 }
@@ -288,7 +264,6 @@ uint8_t LanderDisplay(uint8_t x, uint8_t y, GAME * game) {
 uint8_t getLanderSprite(uint8_t x, uint8_t y, GAME * game)
 {
   uint8_t sprite = 0x00;
-
   if (game->ShipExplode > 0)
   {
     sprite = pgm_read_byte(&LANDER[(x - game->ShipPosX) + ((8 - (game->ShipExplode)) * 7) ]);
@@ -298,16 +273,12 @@ uint8_t getLanderSprite(uint8_t x, uint8_t y, GAME * game)
       game->ShipExplode = 3;
     return sprite;
   }
-
-  // top sprite (4 bit)
   if (game->ThrustLEFT)
     sprite = pgm_read_byte(&LANDER[(x - game->ShipPosX) + 21]);
   else if (game->ThrustRIGHT)
     sprite = pgm_read_byte(&LANDER[(x - game->ShipPosX) + 28]);
   else
     sprite = pgm_read_byte(&LANDER[(x - game->ShipPosX) ]);
-
-  // bottom spite (4 bit)
   if (game->ThrustUP && game->Toggle && game->Fuel > 0)
     return (sprite |= pgm_read_byte(&LANDER[(x - game->ShipPosX) + 14]));
   else
@@ -319,7 +290,6 @@ uint8_t FuelDisplay(uint8_t x, uint8_t y, GAME * game)
   if (y != 6) return 0x00;
   if (x > 4 && x <= 19)
   {
-    // max fuel = 15.000 Liter - each liter = 1 fuel-bar we have 15 bars
     if ((game->Fuel / 1000) + 1 > x - 4 || ((x - 4 == 1) && game->Fuel > 0))
       return 0xF8;
     else
@@ -335,14 +305,10 @@ uint8_t GameDisplay(uint8_t x, uint8_t y, GAME * game)
   {
     uint8_t frame;
     if (x == offset || x == 127)
-      // left and right border-line
       frame = 0xFF;
     else
-      // draw the map from the coordinates given by the GAMEMAP
       frame = GETLANDSCAPE(x - offset, y, ((game->Level - 1) * 2), game);
-
     uint8_t ship = LanderDisplay(x, y, game);
-
     if (y == 7 && x >= (game->LandingPadLEFT + offset) && x <= (game->LandingPadRIGHT + offset))
     {
       if (ship != 0 && (0xFC | ship) != (0xFC + ship))
@@ -371,7 +337,6 @@ uint8_t GameDisplay(uint8_t x, uint8_t y, GAME * game)
       game->Collision = true;
       return frame | LanderDisplay(x, y, game);
     }
-
     return frame | ship;
   }
   return 0x00;
@@ -382,35 +347,22 @@ uint8_t StarsDisplay(uint8_t x, uint8_t y, GAME * game)
   const uint8_t o1 = 23;
   uint8_t bg = 0x00;
   if (y == 0 && x > o1)
-  {
     bg |= 0x01;
-  }
   if (x == o1)
-  {
     bg |= 0xFF;
-  }
   if (x == 127)
-  {
     bg |= 0xFF;
-  }
   if (y == 7 && x > o1)
-  {
     bg |= 0x80;
-  }
-
   const uint8_t offset = 40;
   if (y > 1 && y < 5)
   {
     if (x > offset &&  x < (offset + 72))
     {
       if (game->Stars > (x - offset) / 24)
-      {
         return pgm_read_byte(&STARFULL[((x - offset) % 24) + ((y - 2) * 24)] );
-      }
       else
-      {
         return pgm_read_byte(&STAROUTLINE[((x - offset) % 24) + ((y - 2) * 24)] );
-      }
     }
   }
   return bg;
@@ -420,35 +372,29 @@ uint8_t LivesDisplay(uint8_t x, uint8_t y, GAME * game)
 {
   const uint8_t offset = 1;
   if (y == 7 && x >= offset && x < (4 * 5) + offset)
-  {
     if (game->Lives > (x - offset) / 5)
       return pgm_read_byte(&LIVE[(x - offset) % 5]);
-  }
   return 0x00;
 }
 
 void Tiny_Flip(uint8_t mode, GAME * game, DIGITAL * score, DIGITAL * velX, DIGITAL * velY) {
-  uint8_t y, x;
-  for (y = 0; y < 8; y++)
-  {
-    SSD1306.ssd1306_send_command(0xb0 + y);
-    SSD1306.ssd1306_send_command(0x00);
-    SSD1306.ssd1306_send_command(0x10);
-    SSD1306.ssd1306_send_data_start();
-    for (x = 0; x < 128; x++)
-    {
+  for (uint8_t y = 0; y < 8; y++) {
+    ssd1306_selectPage(y);
+    for (uint8_t x = 0; x < 128; x++) {
+      uint8_t px;
       if (mode == 0) {
-        SSD1306.ssd1306_send_byte(GameDisplay(x, y, game) | LivesDisplay(x, y, game) | DashboardDisplay(x, y, game) | ScoreDisplay(x, y, score) | VelocityDisplay(x, y, velX, 1) | VelocityDisplay(x, y, velY, 0) | FuelDisplay(x, y, game));
+        px = GameDisplay(x, y, game) | LivesDisplay(x, y, game) | DashboardDisplay(x, y, game)
+           | ScoreDisplay(x, y, score) | VelocityDisplay(x, y, velX, 1) | VelocityDisplay(x, y, velY, 0)
+           | FuelDisplay(x, y, game);
       } else if (mode == 1) {
-        SSD1306.ssd1306_send_byte(pgm_read_byte(&INTRO[x + (y * 128)]));
+        px = pgm_read_byte(&INTRO[x + (y * 128)]);
+      } else if (mode == 2) {
+        px = StarsDisplay(x, y, game) | LivesDisplay(x, y, game) | DashboardDisplay(x, y, game)
+           | ScoreDisplay(x, y, score) | VelocityDisplay(x, y, velX, 1) | VelocityDisplay(x, y, velY, 0)
+           | FuelDisplay(x, y, game);
       }
-      else if (mode == 2)
-      {
-        SSD1306.ssd1306_send_byte(StarsDisplay ( x, y, game) | LivesDisplay(x, y, game) | DashboardDisplay(x, y, game) | ScoreDisplay(x, y, score) | VelocityDisplay(x, y, velX, 1) | VelocityDisplay(x, y, velY, 0) | FuelDisplay(x, y, game));
-      }
+      i2c_write(px);
     }
-    if (mode == 0 || mode == 2) {
-      SSD1306.ssd1306_send_data_stop();
-    }
+    i2c_stop();
   }
 }
