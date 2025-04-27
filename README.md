@@ -1,4 +1,4 @@
-Tiny Dungeon – FastTinyDriver Edition
+Tiny Lander – FastTinyDriver Edition
 
 This is a fork of the Tiny Lander for the ATtiny85-based TinyJoypad console, updated to use the FastTinyDriver OLED display driver by Daniel C / Electro L.I.B.
 
